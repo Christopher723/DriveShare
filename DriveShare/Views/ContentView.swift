@@ -54,7 +54,7 @@ struct ContentView: View {
     }
     private var carUpload: some View {
         NavigationLink {
-            AddCarView()
+            AddCarView().environmentObject(firestoreManager)
         } label: {
             Image(systemName: "car.fill")
                 .font(.title.weight(.semibold))

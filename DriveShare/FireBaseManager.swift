@@ -15,13 +15,13 @@ struct Car: Codable,Identifiable{
     var Mileage: Int
     var PickUpLocation: GeoPoint
     var Pricing: Int
-    var Year: String
+    var Year: Int
 }
 
 class FirestoreManager: ObservableObject {
     @Published var Cars: [Car] = []
     private let db = Firestore.firestore()
-
+    
     func fetchData() {
         let docRef = db.collection("carList")
         docRef.getDocuments { (snapshot, error) in
@@ -29,7 +29,6 @@ class FirestoreManager: ObservableObject {
                 print("Error fetching documents: \(error?.localizedDescription ?? "")")
                 return
             }
-            
             if let snapshot = snapshot, !snapshot.isEmpty {
                 for document in snapshot.documents {
                     do{
@@ -48,28 +47,17 @@ class FirestoreManager: ObservableObject {
                 print("No documents found.")
             }
         }
-//        let docRef = db.collection("carList")
-//        docRef.getDocument { (document, error) in
-//            guard error == nil else {
-//                print("error", error ?? "")
-//                return
-//            }
-//            if let document = document, document.exists {
-//                let data = document.data()
-//                if let data = data {
-//                    print("data", data)
-//                }
-//            }
-//            
-//        }
-//        db.collection("carList").addSnapshotListener { (querySnapshot, error) in
-//            guard let documents = querySnapshot?.documents else {
-//                print("No documents")
-//                return
-//            }
-//            self.Cars = documents.compactMap { (document) -> Car? in
-//                try? document.data(as: Car.self)
-//            }
-//        }
+    }
+    
+    func addCar(CarModel: String,Availability: [String],Mileage: Int,PickUpLocation: GeoPoint,Pricing: Int,Year: Int){
+        let docRef = db.collection("carList")
+        docRef.addDocument(data: [
+            "CarModel": CarModel,
+            "Availability": Availability,
+            "Mileage": Mileage,
+            "PickUpLocation": PickUpLocation,
+            "Pricing": Pricing,
+            "Year": Year
+        ])
     }
 }
