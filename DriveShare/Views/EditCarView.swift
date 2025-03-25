@@ -10,7 +10,6 @@ import FirebaseFirestore
 
 struct EditCarView: View {
     @EnvironmentObject var firestoreManager: FirestoreManager
-    @Environment(\.presentationMode) var presentationMode
     @State var car: Car
     
     var body: some View {
@@ -40,7 +39,6 @@ struct EditCarView: View {
                     Year: car.Year,
                     userId: car.userId ?? ""
                 )
-                presentationMode.wrappedValue.dismiss()
             }
         }
         .navigationTitle("Edit Car")

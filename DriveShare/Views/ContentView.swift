@@ -37,20 +37,17 @@ struct ContentView: View {
                     
                 }
                 Spacer()
-                bottomNavigationBar
+                HStack(spacing: 30){
+                    settingsLink
+                    carUpload
+                    carList
+                    }
             }
             
         }
         .navigationTitle("DriveShare")
         .searchable(text: $searchText)
         
-    }
-    private var bottomNavigationBar: some View {
-        HStack(spacing: 30){
-            settingsLink
-            carUpload
-            carList
-            }
     }
 
     private var settingsLink: some View {
