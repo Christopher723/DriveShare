@@ -91,4 +91,16 @@ class FirestoreManager: ObservableObject {
             "userId": userId
         ])
     }
+    func editCar(id: String, CarModel: String,Availability: [String],Mileage: Int,PickUpLocation: GeoPoint,Pricing: Int,Year: Int,userId: String){
+        let docRef = db.collection("carList").document(id)
+        docRef.updateData([
+            "CarModel": CarModel,
+            "Availability": Availability,
+            "Mileage": Mileage,
+            "PickUpLocation": PickUpLocation,
+            "Pricing": Pricing,
+            "Year": Year,
+            "userId": userId
+        ])
+    }
 }

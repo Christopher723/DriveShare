@@ -16,9 +16,17 @@ struct ContentView: View {
                 ScrollView{
                     LazyVGrid(columns: gridItems, spacing: 20) {
                         ForEach(firestoreManager.Cars, id: \.id) { Car in
-                            VStack(alignment: .leading) {
-                                Text(Car.CarModel).font(.headline)
-                                Text("\(Car.Pricing)")
+                            NavigationLink {
+                                CarDetailView(car: Car, isOwner: Car.userId == currentUser)
+                            } label: {
+                                VStack(alignment: .leading) {
+                                    Text(Car.CarModel).font(.headline)
+                                    Text("$\(Car.Pricing)/day")
+                                }
+                                .padding()
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(Color.gray.opacity(0.1))
+                                .cornerRadius(10)
                             }
                         }
                     }.onAppear {
