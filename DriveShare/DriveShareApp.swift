@@ -21,9 +21,10 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 @main
 struct DriveShareApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
+    @StateObject private var viewModel = SignInEmaiLViewModel()
     var body: some Scene {
         WindowGroup {
-            RootView()
+            RootView().environmentObject(viewModel)
         }
     }
 }

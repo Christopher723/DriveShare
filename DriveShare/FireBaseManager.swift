@@ -16,13 +16,16 @@ struct Car: Codable,Identifiable{
     var PickUpLocation: GeoPoint
     var Pricing: Int
     var Year: Int
+    var userId: String?
 }
 
 class FirestoreManager: ObservableObject {
     @Published var Cars: [Car] = []
     private let db = Firestore.firestore()
     
-    func fetchData() {
+    func fetchData(email: String) {
+        self.Cars = []
+        //THIS DOESNT FETCH CARS THAT BELONG TO THE USER
         let docRef = db.collection("carList")
         docRef.getDocuments { (snapshot, error) in
             guard error == nil else {
@@ -35,7 +38,9 @@ class FirestoreManager: ObservableObject {
                         let car = try document.data(as: Car.self)
 //                        print("car", car)
 //                        print("data", document.data())
-                        self.Cars.append(car)
+                        if car.userId != email{
+                            self.Cars.append(car)
+                        }
                     }
                     catch{
                         print(error)
@@ -48,8 +53,33 @@ class FirestoreManager: ObservableObject {
             }
         }
     }
+    func fetchUserCars(email: String){
+        self.Cars = []
+        let docRef = db.collection("carList")
+        docRef.getDocuments { (snapshot, error) in
+            guard error == nil else {
+                print("Error fetching documents: \(error?.localizedDescription ?? "")")
+                return
+            }
+            if let snapshot = snapshot, !snapshot.isEmpty {
+                for document in snapshot.documents {
+                    do{
+                        let car = try document.data(as: Car.self)
+                        if car.userId! == email{
+                            self.Cars.append(car)
+                        }
+                    }
+                    catch{
+                        print(error)
+                    }
+                }
+            } else {
+                print("No documents found.")
+            }
+        }
+    }
     
-    func addCar(CarModel: String,Availability: [String],Mileage: Int,PickUpLocation: GeoPoint,Pricing: Int,Year: Int){
+    func addCar(CarModel: String,Availability: [String],Mileage: Int,PickUpLocation: GeoPoint,Pricing: Int,Year: Int,userId: String){
         let docRef = db.collection("carList")
         docRef.addDocument(data: [
             "CarModel": CarModel,
@@ -57,7 +87,8 @@ class FirestoreManager: ObservableObject {
             "Mileage": Mileage,
             "PickUpLocation": PickUpLocation,
             "Pricing": Pricing,
-            "Year": Year
+            "Year": Year,
+            "userId": userId
         ])
     }
 }

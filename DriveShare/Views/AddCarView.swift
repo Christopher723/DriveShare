@@ -10,12 +10,16 @@ import FirebaseFirestore
 
 struct AddCarView: View {
     @EnvironmentObject var firestoreManager: FirestoreManager
+//    @EnvironmentObject private var viewModel: SignInEmaiLViewModel
     @State var CarModel: String = ""
     @State var Availability: [String] = [""]
     @State var Mileage: Int = 0
     @State var PickUpLocation: GeoPoint = GeoPoint(latitude: 0, longitude: 0)
     @State var Pricing: Int = 0
     @State var Year:  Int = 0
+    
+    let currentUser = try? AuthenticationManager.shared.getAuthUser().email ?? "No User"
+    
     
     private var numberFormatter: NumberFormatter {
         let formatter = NumberFormatter()
@@ -67,7 +71,8 @@ struct AddCarView: View {
                 Mileage: Mileage,
                 PickUpLocation: PickUpLocation,
                 Pricing: Pricing,
-                Year: Year)
+                Year: Year,
+                userId: currentUser ?? "noEmail")
         },
                label: {
             Text("Add Car")

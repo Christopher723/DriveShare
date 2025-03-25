@@ -13,7 +13,7 @@ struct AuthView: View{
     var body: some View{
         NavigationView {
             VStack{
-                Text("Welcome to Sticker Shop")
+                Text("Welcome to Drive Share")
                     .font(.title)
                     .bold()
                 Spacer()

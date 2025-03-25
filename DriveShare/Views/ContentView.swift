@@ -3,8 +3,10 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject var firestoreManager = FirestoreManager()
+    @EnvironmentObject private var viewModel: SignInEmaiLViewModel
     @State private var searchText = ""
     @Binding var showSignInView: Bool
+    let currentUser = try? AuthenticationManager.shared.getAuthUser().email ?? "No User"
     let gridItems = [GridItem(.flexible()), GridItem(.flexible())]
 
     var body: some View {
@@ -13,14 +15,16 @@ struct ContentView: View {
             VStack {
                 ScrollView{
                     LazyVGrid(columns: gridItems, spacing: 20) {
-                        ForEach(firestoreManager.Cars) { Car in
+                        ForEach(firestoreManager.Cars, id: \.id) { Car in
                             VStack(alignment: .leading) {
                                 Text(Car.CarModel).font(.headline)
                                 Text("\(Car.Pricing)")
                             }
                         }
                     }.onAppear {
-                        firestoreManager.fetchData()
+                        if let currentUser{
+                            firestoreManager.fetchData(email: currentUser)
+                        }
                     }
                     
                 }
@@ -34,9 +38,10 @@ struct ContentView: View {
         
     }
     private var bottomNavigationBar: some View {
-        HStack(spacing: 100){
+        HStack(spacing: 30){
             settingsLink
             carUpload
+            carList
             }
     }
 
@@ -52,9 +57,23 @@ struct ContentView: View {
                 .padding(15)
         }
     }
+    private var carList: some View{
+        NavigationLink {
+            UsersCarListView().environmentObject(firestoreManager)
+        } label: {
+            Image(systemName: "list.bullet.clipboard.fill")
+                .font(.title.weight(.semibold))
+                .padding()
+                .clipShape(Circle())
+                .shadow(radius: 4, x: 0, y: 4)
+                .padding(15)
+        }
+    }
+    
     private var carUpload: some View {
         NavigationLink {
             AddCarView().environmentObject(firestoreManager)
+                //.environmentObject(viewModel) doesnt need to be based down the view chain
         } label: {
             Image(systemName: "car.fill")
                 .font(.title.weight(.semibold))

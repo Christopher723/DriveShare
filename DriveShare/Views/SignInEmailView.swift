@@ -42,7 +42,7 @@ final class SignInEmaiLViewModel: ObservableObject {
     }
 }
 struct SignInEmailView: View {
-    @StateObject private var viewModel = SignInEmaiLViewModel()
+    @EnvironmentObject private var viewModel: SignInEmaiLViewModel
     @Binding var showSignInView: Bool
     
     var body: some View {
