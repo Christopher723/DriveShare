@@ -161,7 +161,7 @@ struct ContentView: View {
                     LazyVGrid(columns: gridItems, spacing: 20) {
                         ForEach(filteredCars, id: \.id) { Car in
                             NavigationLink {
-                                CarDetailView(car: Car, isOwner: Car.userId == currentUser)
+                                CarDetailView(car: Car, isOwner: Car.userId == currentUser).environmentObject(firestoreManager)
                             } label: {
                                 VStack(alignment: .leading) {
                                     Text(Car.CarModel).font(.headline)
@@ -196,6 +196,7 @@ struct ContentView: View {
                 HStack(spacing: 30) {
                     settingsLink
                     carUpload
+                    messagingLink
                     carList
                 }
             }
@@ -258,6 +259,18 @@ struct ContentView: View {
             AddCarView().environmentObject(firestoreManager)
         } label: {
             Image(systemName: "car.fill")
+                .font(.title.weight(.semibold))
+                .padding()
+                .clipShape(Circle())
+                .shadow(radius: 4, x: 0, y: 4)
+                .padding(15)
+        }
+    }
+    private var messagingLink: some View {
+        NavigationLink {
+            MessagingView().environmentObject(firestoreManager)
+        } label: {
+            Image(systemName: "message.fill")
                 .font(.title.weight(.semibold))
                 .padding()
                 .clipShape(Circle())

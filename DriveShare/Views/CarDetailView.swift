@@ -13,6 +13,7 @@ import FirebaseFirestore
 struct CarDetailView: View {
     var car: Car
     var isOwner = false
+    @EnvironmentObject var firestoreManager: FirestoreManager
     
     var body: some View {
         ScrollView {
@@ -68,17 +69,18 @@ struct CarDetailView: View {
                             .font(.caption)
                             .foregroundColor(.gray)
                         
-                        // New Calendar View with flipped logic
+                        // Calendar View
                         AvailabilityCalendarView(unavailableDates: car.Availability)
                     }
                     
                     Divider()
                     
-                    // Owner Actions
+                    // Owner Actions or Renter Actions
                     if isOwner {
                         OwnerActionsView(car: car)
                     } else {
-                        RenterActionsView()
+                        RenterActionsView(car: car)
+                            .environmentObject(firestoreManager)
                     }
                 }
                 .padding()
@@ -88,7 +90,6 @@ struct CarDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 }
-
 
 struct DetailRow: View {
     let icon: String
@@ -129,6 +130,7 @@ struct PriceView: View {
             .cornerRadius(10)
     }
 }
+
 struct OwnerActionsView: View {
     let car: Car
     
@@ -164,6 +166,7 @@ struct OwnerActionsView: View {
         }
     }
 }
+
 struct ManageAvailabilityView: View {
     let car: Car
     @State private var selectedDates: [Date] = []
@@ -196,18 +199,15 @@ struct ManageAvailabilityView: View {
         .navigationTitle("Block Dates")
         .sheet(isPresented: $showingDatePicker) {
             // This is a placeholder for a date picker sheet
-            // You would implement a multi-date selection calendar here
             Text("Date Selection Sheet")
                 .padding()
         }
     }
 }
 
-import SwiftUI
-import FirebaseFirestore
-
-// First, let's modify the RenterActionsView to show our payment sheet
 struct RenterActionsView: View {
+    let car: Car
+    @EnvironmentObject var firestoreManager: FirestoreManager
     @State private var showingPaymentSheet = false
     @State private var selectedStartDate = Date()
     @State private var selectedEndDate = Date().addingTimeInterval(86400) // Next day by default
@@ -252,22 +252,24 @@ struct RenterActionsView: View {
         }
         .sheet(isPresented: $showingPaymentSheet) {
             PaymentView(
+                car: car,
                 startDate: selectedStartDate,
                 endDate: selectedEndDate,
                 onComplete: {
                     showingPaymentSheet = false
-                    // Here you would update the booking in Firestore
                 }
             )
+            .environmentObject(firestoreManager)
         }
     }
 }
 
-// Now let's create our PaymentView
 struct PaymentView: View {
+    let car: Car
     let startDate: Date
     let endDate: Date
     let onComplete: () -> Void
+    @EnvironmentObject var firestoreManager: FirestoreManager
     
     @State private var cardNumber = ""
     @State private var cardholderName = ""
@@ -459,10 +461,22 @@ struct PaymentView: View {
             isProcessing = false
             bookingComplete = true
             
-            // In a real app, you would update Firestore here
-            // to mark these dates as booked
+            // Send message to car owner about the booking
+            if let carOwnerId = car.userId {
+                let dateFormatter = DateFormatter()
+                dateFormatter.dateStyle = .medium
+                
+                let bookingMessage = "I've booked your \(car.CarModel) from \(dateFormatter.string(from: startDate)) to \(dateFormatter.string(from: endDate)). Booking reference: \(generateBookingReference())"
+                
+                firestoreManager.sendMessage(
+                    to: carOwnerId,
+                    content: bookingMessage,
+                    relatedCarId: car.id
+                )
+            }
         }
     }
+
     
     private func generateBookingReference() -> String {
         let letters = "ABCDEFGHJKLMNPQRSTUVWXYZ"
