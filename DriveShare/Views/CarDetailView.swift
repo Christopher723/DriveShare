@@ -8,6 +8,8 @@
 import SwiftUI
 import FirebaseFirestore
 
+
+
 struct CarDetailView: View {
     var car: Car
     var isOwner = false
@@ -58,20 +60,16 @@ struct CarDetailView: View {
                         DetailRow(icon: "mappin.and.ellipse", title: "Pickup Location", value: "View on map")
                         
                         Text("Availability")
-                            .font(.headline)
+                            .font(.title3)
+                            .bold()
                             .padding(.top, 8)
                         
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 10) {
-                                ForEach(car.Availability, id: \.self) { date in
-                                    Text(date)
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 8)
-                                        .background(Color.green.opacity(0.1))
-                                        .cornerRadius(8)
-                                }
-                            }
-                        }
+                        Text("Green dates are available for booking. Red dates are unavailable.")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                        
+                        // New Calendar View with flipped logic
+                        AvailabilityCalendarView(unavailableDates: car.Availability)
                     }
                     
                     Divider()
@@ -90,6 +88,7 @@ struct CarDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 }
+
 
 struct DetailRow: View {
     let icon: String
@@ -130,7 +129,6 @@ struct PriceView: View {
             .cornerRadius(10)
     }
 }
-
 struct OwnerActionsView: View {
     let car: Car
     
@@ -152,9 +150,7 @@ struct OwnerActionsView: View {
                 .cornerRadius(10)
             }
             
-            Button(action: {
-                // Manage availability
-            }) {
+            NavigationLink(destination: ManageAvailabilityView(car: car)) {
                 HStack {
                     Image(systemName: "calendar")
                     Text("Manage Availability")
@@ -165,6 +161,44 @@ struct OwnerActionsView: View {
                 .foregroundColor(.white)
                 .cornerRadius(10)
             }
+        }
+    }
+}
+struct ManageAvailabilityView: View {
+    let car: Car
+    @State private var selectedDates: [Date] = []
+    @State private var showingDatePicker = false
+    
+    var body: some View {
+        VStack {
+            Text("Manage Unavailable Dates")
+                .font(.headline)
+                .padding(.top)
+            
+            Text("Mark dates when your car is NOT available for rental")
+                .font(.caption)
+                .foregroundColor(.gray)
+                .padding(.bottom)
+            
+            // Display current availability with flipped logic
+            AvailabilityCalendarView(unavailableDates: car.Availability)
+            
+            Button("Add New Unavailable Dates") {
+                showingDatePicker = true
+            }
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(Color.red)
+            .foregroundColor(.white)
+            .cornerRadius(10)
+            .padding()
+        }
+        .navigationTitle("Block Dates")
+        .sheet(isPresented: $showingDatePicker) {
+            // This is a placeholder for a date picker sheet
+            // You would implement a multi-date selection calendar here
+            Text("Date Selection Sheet")
+                .padding()
         }
     }
 }

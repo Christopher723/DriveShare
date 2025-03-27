@@ -9,11 +9,13 @@ import SwiftUI
 
 struct RootView: View {
     @State private var showSignInView: Bool = false
+    @StateObject var firestoreManager = FirestoreManager()
     @EnvironmentObject private var viewModel: SignInEmaiLViewModel
     var body: some View {
         ZStack{
             NavigationStack{
-                ContentView(showSignInView: $showSignInView).environmentObject(viewModel)
+                ContentView(showSignInView: $showSignInView).environmentObject(viewModel).environmentObject(firestoreManager)
+
 
             }
             

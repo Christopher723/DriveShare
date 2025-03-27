@@ -1,14 +1,8 @@
-//
-//  FireBaseManager.swift
-//  DriveShare
-//
-//  Created by Christopher Woods on 3/17/25.
-//
-
+import SwiftUI
 import Firebase
 import FirebaseFirestore
 
-struct Car: Codable,Identifiable{
+struct Car: Codable, Identifiable {
     @DocumentID var id: String?
     var CarModel: String
     var Availability: [String]
@@ -21,65 +15,60 @@ struct Car: Codable,Identifiable{
 
 class FirestoreManager: ObservableObject {
     @Published var Cars: [Car] = []
-    private let db = Firestore.firestore()
+    private let db: Firestore
+    private var listenerRegistration: ListenerRegistration?
     
-    func fetchData(email: String) {
-        self.Cars = []
-        //THIS DOESNT FETCH CARS THAT BELONG TO THE USER
-        let docRef = db.collection("carList")
-        docRef.getDocuments { (snapshot, error) in
-            guard error == nil else {
-                print("Error fetching documents: \(error?.localizedDescription ?? "")")
-                return
-            }
-            if let snapshot = snapshot, !snapshot.isEmpty {
-                for document in snapshot.documents {
-                    do{
-                        let car = try document.data(as: Car.self)
-//                        print("car", car)
-//                        print("data", document.data())
-                        if car.userId != email{
-                            self.Cars.append(car)
-                        }
-                    }
-                    catch{
-                        print(error)
-                    }
-//                    print("Document ID: \(document.documentID)")
-//                    print("Data: \(document.data())")
-                }
-            } else {
-                print("No documents found.")
-            }
-        }
+    init() {
+        // Enable offline persistence
+        let settings = FirestoreSettings()
+        settings.cacheSettings = PersistentCacheSettings(sizeBytes: 100 * 1024 * 1024 as NSNumber)
+        
+        let db = Firestore.firestore()
+        db.settings = settings
+        self.db = db
     }
-    func fetchUserCars(email: String){
-        self.Cars = []
-        let docRef = db.collection("carList")
-        docRef.getDocuments { (snapshot, error) in
-            guard error == nil else {
-                print("Error fetching documents: \(error?.localizedDescription ?? "")")
+    
+    func setupRealTimeListener(email: String, isUserCars: Bool) {
+        // Remove any existing listener
+        removeListener()
+        
+        let query = db.collection("carList")
+        
+        listenerRegistration = query.addSnapshotListener { [weak self] (snapshot, error) in
+            guard let self = self else { return }
+            
+            if let error = error {
+                print("Error listening for updates: \(error.localizedDescription)")
                 return
             }
-            if let snapshot = snapshot, !snapshot.isEmpty {
-                for document in snapshot.documents {
-                    do{
-                        let car = try document.data(as: Car.self)
-                        if car.userId! == email{
-                            self.Cars.append(car)
-                        }
+            
+            guard let documents = snapshot?.documents else {
+                print("No documents in snapshot")
+                return
+            }
+            
+            self.Cars = documents.compactMap { document in
+                do {
+                    let car = try document.data(as: Car.self)
+                    if isUserCars {
+                        return car.userId == email ? car : nil
+                    } else {
+                        return car.userId != email ? car : nil
                     }
-                    catch{
-                        print(error)
-                    }
+                } catch {
+                    print("Error decoding car: \(error)")
+                    return nil
                 }
-            } else {
-                print("No documents found.")
             }
         }
     }
     
-    func addCar(CarModel: String,Availability: [String],Mileage: Int,PickUpLocation: GeoPoint,Pricing: Int,Year: Int,userId: String){
+    func removeListener() {
+        listenerRegistration?.remove()
+        listenerRegistration = nil
+    }
+    
+    func addCar(CarModel: String, Availability: [String], Mileage: Int, PickUpLocation: GeoPoint, Pricing: Int, Year: Int, userId: String) {
         let docRef = db.collection("carList")
         docRef.addDocument(data: [
             "CarModel": CarModel,
@@ -91,7 +80,8 @@ class FirestoreManager: ObservableObject {
             "userId": userId
         ])
     }
-    func editCar(id: String, CarModel: String,Availability: [String],Mileage: Int,PickUpLocation: GeoPoint,Pricing: Int,Year: Int,userId: String){
+    
+    func editCar(id: String, CarModel: String, Availability: [String], Mileage: Int, PickUpLocation: GeoPoint, Pricing: Int, Year: Int, userId: String) {
         let docRef = db.collection("carList").document(id)
         docRef.updateData([
             "CarModel": CarModel,
@@ -102,5 +92,9 @@ class FirestoreManager: ObservableObject {
             "Year": Year,
             "userId": userId
         ])
+    }
+    
+    deinit {
+        removeListener()
     }
 }
