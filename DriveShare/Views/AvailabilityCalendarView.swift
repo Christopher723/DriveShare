@@ -5,11 +5,11 @@
 //  Created by Christopher Woods on 3/27/25.
 //
 import SwiftUI
-
 struct AvailabilityCalendarView: View {
-    let unavailableDates: [String] // Renamed to clarify these are unavailable dates
+    let unavailableDates: [String] // Dates when the car is NOT available
     @State private var selectedDate: Date? = nil
     @State private var currentMonth: Date = Date()
+    var onDateSelected: ((Date) -> Void)? = nil // Optional callback for date selection
     
     // Convert string dates to Date objects
     private var unavailableDateObjects: [Date] {
@@ -61,6 +61,7 @@ struct AvailabilityCalendarView: View {
                         Button(action: {
                             if isAvailable {
                                 selectedDate = date
+                                onDateSelected?(date) // Call the callback if provided
                             }
                         }) {
                             Text(dayString(from: date))
@@ -100,12 +101,14 @@ struct AvailabilityCalendarView: View {
                         .font(.caption)
                 }
                 
-                HStack {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.blue)
-                        .frame(width: 16, height: 16)
-                    Text("Selected")
-                        .font(.caption)
+                if selectedDate != nil {
+                    HStack {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.blue)
+                            .frame(width: 16, height: 16)
+                        Text("Selected")
+                            .font(.caption)
+                    }
                 }
             }
             .padding(.top, 8)
@@ -168,7 +171,7 @@ struct AvailabilityCalendarView: View {
         return days
     }
     
-    // FLIPPED LOGIC: Date is available if it's NOT in the unavailableDates array
+    // Date is available if it's NOT in the unavailableDates array
     private func isDateAvailable(_ date: Date) -> Bool {
         let calendar = Calendar.current
         // Check if the date is in the past
