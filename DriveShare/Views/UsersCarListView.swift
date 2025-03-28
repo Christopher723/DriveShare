@@ -31,13 +31,16 @@ struct UsersCarListView: View {
                             .cornerRadius(10)
                         }
                     }
-                }.onAppear {
+                }
+                .padding()
+                .onAppear {
                     if let currentUser {
                         firestoreManager.setupRealTimeListener(email: currentUser, isUserCars: true)
                     }
                 }.onDisappear {
                     firestoreManager.removeListener()
                 }
+                
             }
         }
     }

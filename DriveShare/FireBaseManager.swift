@@ -72,7 +72,7 @@ class FirestoreManager: ObservableObject {
         db.settings = settings
         self.db = db
     }
-    
+    // Caching System
     func setupRealTimeListener(email: String, isUserCars: Bool) {
         // Remove any existing listener
         removeListener()

@@ -193,7 +193,7 @@ struct ContentView: View {
                 
                 Spacer()
                 
-                HStack(spacing: 30) {
+                HStack(spacing: 20) {
                     settingsLink
                     carUpload
                     messagingLink
