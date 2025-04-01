@@ -230,7 +230,7 @@ struct ContentView: View {
     // Your existing view components
     private var settingsLink: some View {
         NavigationLink {
-            SettingsView(showSignInView: $showSignInView)
+            SettingsView(showSignInView: $showSignInView).environmentObject(firestoreManager)
         } label: {
             Image(systemName: "gear")
                 .font(.title.weight(.semibold))

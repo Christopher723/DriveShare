@@ -27,6 +27,18 @@ struct Message: Identifiable, Codable {
         return formatter.string(from: timestamp)
     }
 }
+struct Review: Codable, Identifiable {
+    @DocumentID var id: String?
+    var carId: String
+    var reviewerId: String
+    var reviewerName: String
+    var recipientId: String
+    var rating: Int
+    var title: String
+    var comment: String
+    var timestamp: Date
+    var isOwnerReview: Bool // true if owner reviewing renter, false if renter reviewing owner/car
+}
 
 struct Conversation: Identifiable, Codable {
     @DocumentID var id: String?
@@ -60,18 +72,19 @@ struct Notification: Identifiable, Codable {
 
 class FirestoreManager: ObservableObject {
     @Published var Cars: [Car] = []
-    private let db: Firestore
+    public let db: Firestore
     private var listenerRegistration: ListenerRegistration?
     
     init() {
-        // Enable offline persistence
-        let settings = FirestoreSettings()
-        settings.cacheSettings = PersistentCacheSettings(sizeBytes: 100 * 1024 * 1024 as NSNumber)
-        
-        let db = Firestore.firestore()
-        db.settings = settings
-        self.db = db
-    }
+            // Enable offline persistence
+            let settings = FirestoreSettings()
+            settings.cacheSettings = PersistentCacheSettings(sizeBytes: 100 * 1024 * 1024 as NSNumber)
+            
+            let db = Firestore.firestore()
+            db.settings = settings
+            self.db = db
+        }
+    
     // Caching System
     func setupRealTimeListener(email: String, isUserCars: Bool) {
         // Remove any existing listener
@@ -113,6 +126,45 @@ class FirestoreManager: ObservableObject {
         listenerRegistration = nil
     }
     
+    func getUserRentalHistory(userId: String, completion: @escaping ([Booking]) -> Void) {
+            // First get bookings where user is the renter
+            db.collection("bookings")
+                .whereField("renterId", isEqualTo: userId)
+                .getDocuments { [weak self] snapshot, error in
+                    guard let self = self else { return }
+                    
+                    if let error = error {
+                        print("Error fetching rental history: \(error.localizedDescription)")
+                        completion([])
+                        return
+                    }
+                    
+                    var bookings = snapshot?.documents.compactMap { document -> Booking? in
+                        try? document.data(as: Booking.self)
+                    } ?? []
+                    
+                    // Then get bookings where user is the car owner
+                    self.db.collection("bookings")
+                        .whereField("ownerId", isEqualTo: userId)
+                        .getDocuments { snapshot, error in
+                            if let error = error {
+                                print("Error fetching owner history: \(error.localizedDescription)")
+                                completion(bookings) // Return just the renter bookings
+                                return
+                            }
+                            
+                            let ownerBookings = snapshot?.documents.compactMap { document -> Booking? in
+                                try? document.data(as: Booking.self)
+                            } ?? []
+                            
+                            // Combine both sets of bookings and sort by date
+                            bookings.append(contentsOf: ownerBookings)
+                            bookings.sort { $0.timestamp > $1.timestamp } // Most recent first
+                            
+                            completion(bookings)
+                        }
+                }
+        }
     func addCar(CarModel: String, Availability: [String], Mileage: Int, PickUpLocation: GeoPoint, Pricing: Int, Year: Int, userId: String) {
         let docRef = db.collection("carList")
         docRef.addDocument(data: [
@@ -145,7 +197,106 @@ class FirestoreManager: ObservableObject {
 }
 extension FirestoreManager {
     // MARK: - Messaging Functions
+    func addReview(carId: String, recipientId: String, rating: Int, title: String, comment: String, isOwnerReview: Bool) {
+        guard let currentUser = try? AuthenticationManager.shared.getAuthUser() else { return }
+        
+        let review = [
+            "carId": carId,
+            "reviewerId": currentUser.email ?? "",
+            "reviewerName": currentUser.email ?? "Anonymous User",
+            "recipientId": recipientId,
+            "rating": rating,
+            "title": title,
+            "comment": comment,
+            "timestamp": FieldValue.serverTimestamp(),
+            "isOwnerReview": isOwnerReview
+        ] as [String: Any]
+        
+        db.collection("reviews").addDocument(data: review) { error in
+            if let error = error {
+                print("Error adding review: \(error.localizedDescription)")
+            } else {
+                // Update average rating on car or user profile
+                self.updateAverageRating(for: isOwnerReview ? recipientId : carId, isUserRating: isOwnerReview)
+            }
+        }
+    }
     
+    func getReviewsForCar(carId: String, completion: @escaping ([Review]) -> Void) {
+        db.collection("reviews")
+            .whereField("carId", isEqualTo: carId)
+            .whereField("isOwnerReview", isEqualTo: false)
+            .order(by: "timestamp", descending: true)
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    print("Error getting car reviews: \(error.localizedDescription)")
+                    completion([])
+                    return
+                }
+                
+                let reviews = snapshot?.documents.compactMap { document -> Review? in
+                    try? document.data(as: Review.self)
+                } ?? []
+                
+                completion(reviews)
+            }
+    }
+    
+    func getReviewsForUser(userId: String, isOwnerReviews: Bool, completion: @escaping ([Review]) -> Void) {
+        db.collection("reviews")
+            .whereField(isOwnerReviews ? "recipientId" : "reviewerId", isEqualTo: userId)
+            .whereField("isOwnerReview", isEqualTo: isOwnerReviews)
+            .order(by: "timestamp", descending: true)
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    print("Error getting user reviews: \(error.localizedDescription)")
+                    completion([])
+                    return
+                }
+                
+                let reviews = snapshot?.documents.compactMap { document -> Review? in
+                    try? document.data(as: Review.self)
+                } ?? []
+                
+                completion(reviews)
+            }
+    }
+    
+    private func updateAverageRating(for id: String, isUserRating: Bool) {
+        // Query to get all reviews for this car or user
+        let query = db.collection("reviews")
+            .whereField(isUserRating ? "recipientId" : "carId", isEqualTo: id)
+            .whereField("isOwnerReview", isEqualTo: isUserRating)
+        
+        query.getDocuments { snapshot, error in
+            if let error = error {
+                print("Error calculating average rating: \(error.localizedDescription)")
+                return
+            }
+            
+            guard let documents = snapshot?.documents, !documents.isEmpty else { return }
+            
+            // Calculate average rating
+            let totalRating = documents.reduce(0) { sum, document in
+                sum + (document.data()["rating"] as? Int ?? 0)
+            }
+            
+            let averageRating = Double(totalRating) / Double(documents.count)
+            
+            // Update the average rating on the car or user profile
+            if isUserRating {
+                // Update user profile with average rating
+                self.db.collection("users").document(id).updateData([
+                    "averageRating": averageRating
+                ])
+            } else {
+                // Update car with average rating
+                self.db.collection("carList").document(id).updateData([
+                    "averageRating": averageRating
+                ])
+            }
+        }
+    }
     func sendMessage(to receiverId: String, content: String, relatedCarId: String? = nil) {
         guard let currentUser = try? AuthenticationManager.shared.getAuthUser().email else { return }
         
@@ -169,7 +320,7 @@ extension FirestoreManager {
             }
         }
     }
-
+    
     private func updateConversation(with senderId: String, receiverId: String, lastMessage: String, relatedCarId: String?) {
         // Create a unique conversation ID based on participants (sorted to ensure consistency)
         let participants = [senderId, receiverId].sorted()
@@ -212,7 +363,7 @@ extension FirestoreManager {
             }
         }
     }
-
+    
     func getConversations(completion: @escaping ([Conversation]) -> Void) {
         guard let currentUser = try? AuthenticationManager.shared.getAuthUser().email else {
             completion([])
@@ -236,7 +387,7 @@ extension FirestoreManager {
                 completion(conversations)
             }
     }
-
+    
     func getMessages(for conversationId: String, completion: @escaping ([Message]) -> Void) {
         db.collection("messages")
             .whereField("conversationId", isEqualTo: conversationId)

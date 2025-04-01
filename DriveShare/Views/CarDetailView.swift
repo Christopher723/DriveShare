@@ -133,6 +133,7 @@ struct PriceView: View {
 
 struct OwnerActionsView: View {
     let car: Car
+    @State private var showingRenterReviews = false
     
     var body: some View {
         VStack(spacing: 16) {
@@ -163,9 +164,77 @@ struct OwnerActionsView: View {
                 .foregroundColor(.white)
                 .cornerRadius(10)
             }
+            
+            Button(action: {
+                showingRenterReviews = true
+            }) {
+                HStack {
+                    Image(systemName: "person.crop.circle.badge.checkmark")
+                    Text("Review Renters")
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.orange)
+                .foregroundColor(.white)
+                .cornerRadius(10)
+            }
+            .sheet(isPresented: $showingRenterReviews) {
+                ReviewRentersListView(car: car)
+            }
         }
     }
 }
+
+struct ReviewRentersListView: View {
+    let car: Car
+    @EnvironmentObject var firestoreManager: FirestoreManager
+    @State private var renters: [String] = []
+    @State private var selectedRenter: String? = nil
+    @State private var showingReviewSheet = false
+    
+    var body: some View {
+        NavigationView {
+            List {
+                if renters.isEmpty {
+                    Text("No renters have booked this car yet")
+                        .foregroundColor(.gray)
+                } else {
+                    ForEach(renters, id: \.self) { renter in
+                        Button(action: {
+                            selectedRenter = renter
+                            showingReviewSheet = true
+                        }) {
+                            HStack {
+                                Text(renter)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Select Renter to Review")
+            .onAppear {
+                // In a real app, you would fetch the list of users who have rented this car
+                // For now, we'll use a placeholder
+                renters = ["user1@example.com", "user2@example.com"]
+            }
+            .sheet(isPresented: $showingReviewSheet) {
+                if let renter = selectedRenter {
+                    AddReviewView(
+                        car: car,
+                        recipientId: renter,
+                        isOwnerReview: true,
+                        onComplete: {}
+                    )
+                    .environmentObject(firestoreManager)
+                }
+            }
+        }
+    }
+}
+
 
 struct ManageAvailabilityView: View {
     let car: Car
@@ -204,11 +273,11 @@ struct ManageAvailabilityView: View {
         }
     }
 }
-
 struct RenterActionsView: View {
     let car: Car
     @EnvironmentObject var firestoreManager: FirestoreManager
     @State private var showingPaymentSheet = false
+    @State private var showingReviewSheet = false
     @State private var selectedStartDate = Date()
     @State private var selectedEndDate = Date().addingTimeInterval(86400) // Next day by default
     
@@ -249,6 +318,32 @@ struct RenterActionsView: View {
                 .foregroundColor(.white)
                 .cornerRadius(10)
             }
+            
+            NavigationLink(destination: ReviewsListView(carId: car.id, userId: nil, isOwnerReviews: false).environmentObject(firestoreManager)) {
+                HStack {
+                    Image(systemName: "star.fill")
+                    Text("See Reviews")
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.yellow.opacity(0.8))
+                .foregroundColor(.white)
+                .cornerRadius(10)
+            }
+            
+            Button(action: {
+                showingReviewSheet = true
+            }) {
+                HStack {
+                    Image(systemName: "square.and.pencil")
+                    Text("Write a Review")
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.green)
+                .foregroundColor(.white)
+                .cornerRadius(10)
+            }
         }
         .sheet(isPresented: $showingPaymentSheet) {
             PaymentView(
@@ -261,8 +356,18 @@ struct RenterActionsView: View {
             )
             .environmentObject(firestoreManager)
         }
+        .sheet(isPresented: $showingReviewSheet) {
+            AddReviewView(
+                car: car,
+                recipientId: car.userId ?? "",
+                isOwnerReview: false,
+                onComplete: {}
+            )
+            .environmentObject(firestoreManager)
+        }
     }
 }
+
 
 struct PaymentView: View {
     let car: Car
@@ -456,23 +561,51 @@ struct PaymentView: View {
         // Simulate payment processing
         isProcessing = true
         
-        // Fake processing delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+        // Get current user email
+        guard let currentUser = try? AuthenticationManager.shared.getAuthUser().email else {
             isProcessing = false
-            bookingComplete = true
-            
-            // Send message to car owner about the booking
-            if let carOwnerId = car.userId {
-                let dateFormatter = DateFormatter()
-                dateFormatter.dateStyle = .medium
+            return
+        }
+        
+        // Create booking document
+        let booking = [
+            "carId": car.id ?? "",
+            "carModel": car.CarModel,
+            "ownerId": car.userId ?? "",
+            "renterId": currentUser,
+            "startDate": startDate,
+            "endDate": endDate,
+            "totalPrice": Double(car.Pricing * numberOfDays),
+            "status": "confirmed",
+            "timestamp": FieldValue.serverTimestamp(),
+            "isUserOwner": false
+        ] as [String: Any]
+        
+        // Add booking to Firestore
+        firestoreManager.db.collection("bookings").addDocument(data: booking) { error in
+            DispatchQueue.main.async {
+                self.isProcessing = false
                 
-                let bookingMessage = "I've booked your \(car.CarModel) from \(dateFormatter.string(from: startDate)) to \(dateFormatter.string(from: endDate)). Booking reference: \(generateBookingReference())"
+                if let error = error {
+                    print("Error creating booking: \(error.localizedDescription)")
+                    return
+                }
                 
-                firestoreManager.sendMessage(
-                    to: carOwnerId,
-                    content: bookingMessage,
-                    relatedCarId: car.id
-                )
+                self.bookingComplete = true
+                
+                // Send message to car owner about the booking
+                if let carOwnerId = self.car.userId {
+                    let dateFormatter = DateFormatter()
+                    dateFormatter.dateStyle = .medium
+                    
+                    let bookingMessage = "I've booked your \(self.car.CarModel) from \(dateFormatter.string(from: self.startDate)) to \(dateFormatter.string(from: self.endDate)). Booking reference: \(self.generateBookingReference())"
+                    
+                    self.firestoreManager.sendMessage(
+                        to: carOwnerId,
+                        content: bookingMessage,
+                        relatedCarId: self.car.id
+                    )
+                }
             }
         }
     }
