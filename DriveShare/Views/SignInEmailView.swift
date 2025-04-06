@@ -7,10 +7,6 @@
 
 import SwiftUI
 
-struct SecurityQuestion{
-    var question: String
-    var answer: String
-}
 
 final class SignInEmaiLViewModel: ObservableObject {
     @Published var email = ""
@@ -37,11 +33,12 @@ final class SignInEmaiLViewModel: ObservableObject {
 
 
         try await AuthenticationManager.shared.createUser(email: email, password: password)
-        return false
+        return true
       
     }
 }
 struct SignInEmailView: View {
+    @EnvironmentObject var firestoreManager: FirestoreManager
     @EnvironmentObject private var viewModel: SignInEmaiLViewModel
     @Binding var showSignInView: Bool
     
@@ -90,7 +87,12 @@ struct SignInEmailView: View {
             
             Spacer()
             
-            
+            NavigationLink(destination: ForgotPasswordView().environmentObject(firestoreManager)) {
+                Text("Forgot Password?")
+                    .foregroundColor(.blue)
+                    .font(.subheadline)
+            }
+            .padding(.top, 8)
             
             
             

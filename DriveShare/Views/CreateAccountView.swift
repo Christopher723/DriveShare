@@ -10,14 +10,15 @@ import SwiftUI
 
 struct CreateAccountView: View {
     @StateObject private var viewModel = SignInEmaiLViewModel()
+    @EnvironmentObject var firestoreManager: FirestoreManager
     @Binding var showSignInView: Bool
     @State var errorMessage = ""
-    @State private var selectedQuestion1: String = ""
-    @State private var selectedQuestion2: String = ""
-    @State private var selectedQuestion3: String = ""
-    @State private var securityAnswer1: String = ""
-    @State private var securityAnswer2: String = ""
-    @State private var securityAnswer3: String = ""
+    @State private var selectedQuestion1: String = " "
+    @State private var selectedQuestion2: String = " "
+    @State private var selectedQuestion3: String = " "
+    @State private var securityAnswer1: String = " "
+    @State private var securityAnswer2: String = " "
+    @State private var securityAnswer3: String = " "
     
     var body: some View {
         VStack {
@@ -45,16 +46,31 @@ struct CreateAccountView: View {
 
             
             Button{
-                Task{
-                    do{
-                        showSignInView =
-                        try await viewModel.signUp()
+                // In CreateAccountView, after successful account creation
+                Task {
+                    do {
+                        let result = try await viewModel.signUp()
                         
-                    }
-                    catch {
+                        // Save security questions
+                        if result {
+                            let questions = [
+                                (index: 0, question: selectedQuestion1, answer: securityAnswer1),
+                                (index: 1, question: selectedQuestion2, answer: securityAnswer2),
+                                (index: 2, question: selectedQuestion3, answer: securityAnswer3)
+                            ]
+                            
+                            // Assuming you have access to FirestoreManager
+                            print("HEREHEREHREHREHREHREHREHREHR")
+                            firestoreManager.saveSecurityQuestions(userId: viewModel.email, questions: questions)
+                            
+                            showSignInView = true
+                        }
+                    } catch {
+                        print(error)
                         errorMessage = "\(error)"
                     }
                 }
+
             }label: {
                 Text("Sign Up")
                     .font(.headline)
@@ -83,6 +99,7 @@ struct CreateAccountView: View {
 #Preview {
     CreateAccountView(showSignInView: .constant(false))
 }
+
 
 struct SecurityQuestionView: View {
     var number: Int

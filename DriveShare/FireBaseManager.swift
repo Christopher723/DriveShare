@@ -197,6 +197,100 @@ class FirestoreManager: ObservableObject {
 }
 extension FirestoreManager {
     // MARK: - Messaging Functions
+    func saveSecurityQuestions(userId: String, questions: [(index: Int, question: String, answer: String)]) {
+        let db = Firestore.firestore()
+        let batch = db.batch()
+        
+        for questionData in questions {
+            let docRef = db.collection("securityQuestions").document()
+            
+            let data: [String: Any] = [
+                "userId": userId,
+                "questionIndex": questionData.index,
+                "question": questionData.question,
+                "answer": questionData.answer.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+            ]
+            
+            batch.setData(data, forDocument: docRef)
+        }
+        
+        batch.commit { error in
+            if let error = error {
+                print("Error saving security questions: \(error.localizedDescription)")
+            } else {
+                print("Security questions saved successfully")
+            }
+        }
+    }
+
+        
+        func getSecurityQuestions(forEmail email: String, completion: @escaping ([String]) -> Void) {
+            db.collection("securityQuestions")
+                .whereField("userId", isEqualTo: email)
+                .getDocuments { snapshot, error in
+                    if let error = error {
+                        print("Error fetching security questions: \(error.localizedDescription)")
+                        completion([])
+                        return
+                    }
+                    
+                    let questions = snapshot?.documents.compactMap { document -> String? in
+                        document.data()["question"] as? String
+                    } ?? []
+                    
+                    completion(questions)
+                }
+        }
+        
+        func verifySecurityAnswers(email: String, answers: [(question: String, answer: String)],
+                                  completion: @escaping (Bool) -> Void) {
+            db.collection("securityQuestions")
+                .whereField("userId", isEqualTo: email)
+                .getDocuments { snapshot, error in
+                    if let error = error {
+                        print("Error verifying answers: \(error.localizedDescription)")
+                        completion(false)
+                        return
+                    }
+                    
+                    guard let documents = snapshot?.documents, !documents.isEmpty else {
+                        completion(false)
+                        return
+                    }
+                    
+                    // Create a dictionary of stored questions and answers
+                    var storedQA: [String: String] = [:]
+                    for doc in documents {
+                        if let question = doc.data()["question"] as? String,
+                           let answer = doc.data()["answer"] as? String {
+                            storedQA[question] = answer
+                        }
+                    }
+                    
+                    // Check if provided answers match stored answers
+                    var correctAnswers = 0
+                    for qa in answers {
+                        let normalizedAnswer = qa.answer.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                        if storedQA[qa.question] == normalizedAnswer {
+                            correctAnswers += 1
+                        }
+                    }
+                    
+                    // Require at least 2 correct answers for security
+                    completion(correctAnswers >= 2)
+                    
+                    // Log recovery attempt
+                    self.logPasswordRecoveryAttempt(email: email, isSuccessful: correctAnswers >= 2)
+                }
+        }
+        
+        private func logPasswordRecoveryAttempt(email: String, isSuccessful: Bool) {
+            db.collection("passwordRecoveryAttempts").addDocument(data: [
+                "email": email,
+                "timestamp": FieldValue.serverTimestamp(),
+                "isSuccessful": isSuccessful
+            ])
+        }
     func addReview(carId: String, recipientId: String, rating: Int, title: String, comment: String, isOwnerReview: Bool) {
         guard let currentUser = try? AuthenticationManager.shared.getAuthUser() else { return }
         

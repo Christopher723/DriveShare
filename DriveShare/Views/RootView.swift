@@ -29,6 +29,7 @@ struct RootView: View {
         .fullScreenCover(isPresented: $showSignInView){
             NavigationStack{
                 AuthView(showSignInView: $showSignInView)
+                    .environmentObject(firestoreManager)
             }
         }
     }

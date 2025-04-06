@@ -10,6 +10,7 @@ import SwiftUI
 
 struct AuthView: View{
     @Binding var showSignInView: Bool
+    @EnvironmentObject var firestoreManager: FirestoreManager
     var body: some View{
         NavigationView {
             VStack{
@@ -19,7 +20,7 @@ struct AuthView: View{
                 Spacer()
                 
                 NavigationLink{
-                    CreateAccountView(showSignInView: $showSignInView)
+                    CreateAccountView(showSignInView: $showSignInView).environmentObject(firestoreManager)
                 } label:{
                     Text("Create Account")
                         .font(.headline)
@@ -31,7 +32,7 @@ struct AuthView: View{
                     
                 }
                 NavigationLink{
-                    SignInEmailView(showSignInView: $showSignInView)
+                    SignInEmailView(showSignInView: $showSignInView).environmentObject(firestoreManager)
                 } label:{
                     Text("Sign in with Email")
                         .font(.headline)
